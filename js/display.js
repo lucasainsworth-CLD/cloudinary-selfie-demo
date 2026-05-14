@@ -82,7 +82,19 @@
     const url = listUrl();
     const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) {
-      throw new Error(`List fetch failed (${res.status}). Check cloud name, tag, and Cloudinary Security → Resource list.`);
+      let hint = `List fetch failed (${res.status} ${res.statusText || ""}). URL: ${url}`;
+      if (res.status === 401 || res.status === 403) {
+        hint +=
+          " — Cloudinary usually returns this when the list delivery type is still restricted: Dashboard → Settings → Security → “Restricted media types” → clear “Resource list” (save), or use a signed list URL from a server.";
+      }
+      let bodyPreview = "";
+      try {
+        const t = await res.text();
+        bodyPreview = t ? ` Response: ${t.slice(0, 200)}${t.length > 200 ? "…" : ""}` : "";
+      } catch (_) {
+        /* ignore */
+      }
+      throw new Error(hint + bodyPreview);
     }
     const data = await res.json();
     return sortAndCap(data.resources || []);
