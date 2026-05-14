@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=1920" />
+    <title>Selfie wall</title>
+    <link rel="stylesheet" href="css/display.css" />
+  </head>
+  <body>
+    <div class="wall" id="wall">
+      <header class="wall-header">
+        <div>
+          <div class="wall-title">Live selfie wall</div>
+          <div class="wall-meta" id="wall-status">Loading…</div>
+        </div>
+        <div class="wall-qr-wrap">
+          <img id="wall-qr" width="112" height="112" alt="" />
+          <div class="wall-qr-label">Scan to upload</div>
+        </div>
+      </header>
+      <main class="wall-grid" id="wall-grid" data-scroll="false"></main>
+    </div>
+
+    <div class="wall-error" id="wall-error" hidden>
+      <div>
+        <p><strong>Configuration</strong></p>
+        <p id="wall-error-text"></p>
+        <p><code>js/site-config.js</code> · <code>js/transformations.js</code></p>
+      </div>
+    </div>
+
+    <script src="js/site-config.js"></script>
+    <script src="js/transformations.js"></script>
+    <script src="js/display.js"></script>
+  </body>
+</html>
