@@ -1,29 +1,34 @@
 /**
- * Each step: Cloudinary transformation segment + frame size inside the grid cell
- * (CSS length). Keep frames within ~220px logical cells at MAX_VISIBLE=40 (8×5).
+ * Customize display transforms here — only `name` and `transform` are required.
  *
- * Swap `transform` for named transforms, e.g. "t_my_named_transform".
- * @type {{ transform: string, frameWidth: string, frameHeight: string }[]}
+ * Frame size on the wall is computed automatically from each transform string:
+ *   w_ + h_  → both dimensions
+ *   w_ + ar_ → height from aspect ratio (e.g. ar_1:1,c_auto,w_100 → 100×100)
+ *   h_ + ar_ → width from aspect ratio
+ *   ar_ only → uses DEFAULT_DELIVERY_WIDTH from site-config.js for width
+ *   t_… only (no w/h/ar) → optional deliveryWidth/Height below, or size from loaded image
+ *
+ * @type {{ name: string, transform: string, deliveryWidth?: number, deliveryHeight?: number }[]}
  */
 window.TRANSFORMATIONS = [
   {
-    transform: "w_440,h_440,c_fill,g_auto,q_auto:good",
-    frameWidth: "88%",
-    frameHeight: "88%",
+    name: "square_auto",
+    transform: "w_300,h_300,c_fill,g_auto,q_auto:good",
   },
   {
-    transform: "w_480,h_320,c_fill,g_face,q_auto:good",
-    frameWidth: "96%",
-    frameHeight: "62%",
+    name: "wide_face",
+    transform: "w_300,h_120,c_fill,g_face,q_auto:good",
   },
   {
-    transform: "w_400,h_480,c_fill,g_auto,q_auto:good",
-    frameWidth: "78%",
-    frameHeight: "92%",
+    name: "tall_auto",
+    transform: "w_300,h_400,c_fill,g_auto,q_auto:good",
   },
   {
-    transform: "w_520,h_280,c_fill,g_face,q_auto:good",
-    frameWidth: "98%",
-    frameHeight: "52%",
+    name: "banner_face",
+    transform: "w_300,h_180,c_fill,g_face,q_auto:good",
+  },
+  {
+    name: "flower_BG_replace",
+    transform: "ar_16:9,c_auto,w_300/e_gen_background_replace:prompt_flowers growing all around",
   },
 ];

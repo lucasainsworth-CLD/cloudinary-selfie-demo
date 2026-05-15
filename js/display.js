@@ -3,7 +3,12 @@
 
   const cfg = window.SITE_CONFIG || {};
   const steps = window.TRANSFORMATIONS || [];
-  const TRANSFORM_MS = 5000;
+  const CYCLE_MS = 12000;
+  const POPUP_MS = 4000;
+  const NEW_IMAGE_CYCLES = Math.max(1, Number(cfg.NEW_IMAGE_CYCLES) || 10);
+  const NEW_IMAGES_POPUP_MS = Math.max(1500, Number(cfg.NEW_IMAGES_POPUP_MS) || 3500);
+  const CELL_INNER_HTML =
+    '<div class="frame"><img loading="lazy" alt="" style="opacity:1" /><span class="frame-new-badge" hidden>new</span></div>';
 
   const els = {
     grid: document.getElementById("wall-grid"),
@@ -11,11 +16,30 @@
     status: document.getElementById("wall-status"),
     error: document.getElementById("wall-error"),
     errorText: document.getElementById("wall-error-text"),
+    popup: document.getElementById("transform-popup"),
+    popupName: document.getElementById("transform-popup-name"),
+    popupCode: document.getElementById("transform-popup-code"),
+    transformLabel: document.getElementById("wall-transform-label"),
+    newImagesPopup: document.getElementById("new-images-popup"),
+    newImagesPopupDetail: document.getElementById("new-images-popup-detail"),
   };
 
-  let transformIndex = 0;
+  /** Index currently shown on the grid (poll/render use this). */
+  let displayedTransformIndex = 0;
+  /** Next index while the popup is up (header + popup preview). */
+  let previewTransformIndex = null;
   let pollTimer = null;
-  let transformTimer = null;
+  let cycleTimer = null;
+  let cycleStepTimer = null;
+  let popupFadeTimer = null;
+  let typewriterTimer = null;
+  let typewriterGen = 0;
+  let newImagesPopupTimer = null;
+  let newImagesPopupFadeTimer = null;
+
+  const knownPublicIds = new Set();
+  const newImageCycles = new Map();
+  let listInitialized = false;
 
   function showError(msg) {
     if (els.error && els.errorText) {
@@ -49,6 +73,39 @@
     const t = transformSegment.replace(/^\/+|\/+$/g, "");
     const id = encodePublicId(publicId);
     return `https://res.cloudinary.com/${cloud}/image/upload/${t}/${id}`;
+  }
+
+  const FRAME_TRANSITION_MS = 750;
+
+  function deliveryDimensions(step) {
+    if (step.deliveryWidth > 0 && step.deliveryHeight > 0) {
+      return { w: step.deliveryWidth, h: step.deliveryHeight, source: "manual" };
+    }
+    const parser = window.parseCloudinaryTransformDimensions;
+    if (typeof parser === "function") {
+      return parser(step.transform, {
+        defaultWidth: Number(cfg.DEFAULT_DELIVERY_WIDTH) || 240,
+      });
+    }
+    return { w: 240, h: 240, source: "unknown" };
+  }
+
+  function applyFramePixels(frame, w, h) {
+    const scaleRaw = Number(cfg.FRAME_SCALE);
+    const scale = Number.isFinite(scaleRaw) && scaleRaw > 0 ? scaleRaw : 1;
+    const pxW = Math.round(w * scale);
+    const pxH = Math.round(h * scale);
+    const prevW = frame.dataset.deliveryW;
+    const prevH = frame.dataset.deliveryH;
+    if (prevW === String(pxW) && prevH === String(pxH)) {
+      return;
+    }
+    frame.style.transition = "width var(--frame-transition), height var(--frame-transition)";
+    frame.offsetHeight;
+    frame.style.width = `${pxW}px`;
+    frame.style.height = `${pxH}px`;
+    frame.dataset.deliveryW = String(pxW);
+    frame.dataset.deliveryH = String(pxH);
   }
 
   function validateConfig() {
@@ -100,14 +157,146 @@
     return sortAndCap(data.resources || []);
   }
 
+  function applyFrameSizeAnimated(frame, step) {
+    const dims = deliveryDimensions(step);
+    frame.dataset.inferFromImage = dims.source === "unknown" ? "1" : "0";
+    applyFramePixels(frame, dims.w, dims.h);
+    return dims;
+  }
+
+  function maybeInferFrameFromImage(frame, img) {
+    if (frame.dataset.inferFromImage !== "1") return;
+    const nw = img.naturalWidth;
+    const nh = img.naturalHeight;
+    if (!nw || !nh) return;
+    applyFramePixels(frame, nw, nh);
+    frame.dataset.inferFromImage = "0";
+  }
+
+  function applyImageSrc(img, newSrc, frame) {
+    if (!newSrc || img.dataset.currentSrc === newSrc) return;
+    const fadeMs = FRAME_TRANSITION_MS;
+    img.style.transition = `opacity ${fadeMs}ms ease`;
+    img.style.opacity = "0";
+
+    const preload = new Image();
+    preload.onload = () => {
+      img.src = newSrc;
+      img.dataset.currentSrc = newSrc;
+      if (frame) maybeInferFrameFromImage(frame, img);
+      requestAnimationFrame(() => {
+        img.style.opacity = "1";
+      });
+    };
+    preload.onerror = () => {
+      img.src = newSrc;
+      img.dataset.currentSrc = newSrc;
+      img.style.opacity = "1";
+    };
+    preload.src = newSrc;
+  }
+
+  function activeTransformIndex() {
+    return displayedTransformIndex;
+  }
+
+  function detectNewPublicIds(resources) {
+    const ids = resources.map((r) => r.public_id).filter(Boolean);
+    if (!listInitialized) {
+      ids.forEach((id) => knownPublicIds.add(id));
+      listInitialized = true;
+      return [];
+    }
+    const added = [];
+    ids.forEach((id) => {
+      if (!knownPublicIds.has(id)) {
+        added.push(id);
+        knownPublicIds.add(id);
+      }
+    });
+    return added;
+  }
+
+  function markNewUploads(publicIds) {
+    if (!publicIds.length) return;
+    publicIds.forEach((id) => newImageCycles.set(id, NEW_IMAGE_CYCLES));
+    showNewImagesPopup(publicIds.length);
+  }
+
+  function syncRecentBadge(cell) {
+    if (!cell) return;
+    const cycles = newImageCycles.get(cell.dataset.publicId) || 0;
+    const badge = cell.querySelector(".frame-new-badge");
+    if (cycles > 0) {
+      cell.classList.add("cell--recent");
+      if (badge) badge.hidden = false;
+    } else {
+      cell.classList.remove("cell--recent");
+      if (badge) badge.hidden = true;
+    }
+  }
+
+  function syncAllRecentBadges() {
+    const grid = els.grid;
+    if (!grid) return;
+    grid.querySelectorAll(".cell").forEach(syncRecentBadge);
+  }
+
+  function tickNewImageCycles() {
+    if (!newImageCycles.size) return;
+    for (const [id, left] of [...newImageCycles.entries()]) {
+      if (left <= 1) newImageCycles.delete(id);
+      else newImageCycles.set(id, left - 1);
+    }
+    syncAllRecentBadges();
+  }
+
+  function hideNewImagesPopup() {
+    if (!els.newImagesPopup) return;
+    els.newImagesPopup.classList.remove("is-visible");
+    if (newImagesPopupFadeTimer) clearTimeout(newImagesPopupFadeTimer);
+    newImagesPopupFadeTimer = setTimeout(() => {
+      els.newImagesPopup.hidden = true;
+      newImagesPopupFadeTimer = null;
+    }, 350);
+  }
+
+  function showNewImagesPopup(count) {
+    if (!els.newImagesPopup || count < 1) return;
+    if (newImagesPopupTimer) {
+      clearTimeout(newImagesPopupTimer);
+      newImagesPopupTimer = null;
+    }
+
+    const reveal = () => {
+      if (els.newImagesPopupDetail) {
+        const noun = count === 1 ? "selfie" : "selfies";
+        els.newImagesPopupDetail.textContent = `${count} new ${noun} joined the wall`;
+      }
+      els.newImagesPopup.hidden = false;
+      requestAnimationFrame(() => {
+        els.newImagesPopup.classList.add("is-visible");
+      });
+      newImagesPopupTimer = setTimeout(() => {
+        newImagesPopupTimer = null;
+        hideNewImagesPopup();
+      }, NEW_IMAGES_POPUP_MS);
+    };
+
+    if (els.popup && els.popup.classList.contains("is-visible")) {
+      setTimeout(reveal, 450);
+    } else {
+      reveal();
+    }
+  }
+
   function applyStepToCell(cell, resource) {
-    const step = steps[transformIndex % steps.length];
+    const step = steps[activeTransformIndex() % steps.length];
     const frame = cell.querySelector(".frame");
     const img = cell.querySelector("img");
     if (!frame || !img || !resource) return;
-    frame.style.setProperty("--frame-w", step.frameWidth);
-    frame.style.setProperty("--frame-h", step.frameHeight);
-    img.src = imageUrl(resource.public_id, step.transform);
+    applyFrameSizeAnimated(frame, step);
+    applyImageSrc(img, imageUrl(resource.public_id, step.transform), frame);
     img.alt = resource.public_id || "";
   }
 
@@ -115,27 +304,43 @@
     const grid = els.grid;
     if (!grid) return;
 
+    const newlyAdded = detectNewPublicIds(resources);
     const prevIds = new Set(Array.from(grid.querySelectorAll(".cell")).map((c) => c.dataset.publicId));
-
-    grid.replaceChildren();
+    const existing = new Map(
+      Array.from(grid.querySelectorAll(".cell")).map((c) => [c.dataset.publicId, c])
+    );
+    const fragment = document.createDocumentFragment();
 
     resources.forEach((r) => {
-      const cell = document.createElement("div");
-      cell.className = "cell";
-      cell.dataset.publicId = r.public_id;
-      if (!prevIds.has(r.public_id)) {
-        cell.classList.add("is-new");
+      let cell = existing.get(r.public_id);
+      if (cell) {
+        existing.delete(r.public_id);
+        if (!cell.querySelector(".frame-new-badge")) {
+          cell.innerHTML = CELL_INNER_HTML;
+        }
+      } else {
+        cell = document.createElement("div");
+        cell.className = "cell";
+        cell.dataset.publicId = r.public_id;
+        if (!prevIds.has(r.public_id)) {
+          cell.classList.add("is-arriving");
+        }
+        cell.innerHTML = CELL_INNER_HTML;
       }
-      cell.innerHTML = '<div class="frame"><img loading="lazy" alt="" /></div>';
-      grid.appendChild(cell);
+      fragment.appendChild(cell);
       applyStepToCell(cell, r);
     });
 
-    grid.querySelectorAll(".cell.is-new").forEach((cell) => {
+    grid.replaceChildren(fragment);
+
+    grid.querySelectorAll(".cell.is-arriving").forEach((cell) => {
       requestAnimationFrame(() => {
-        setTimeout(() => cell.classList.remove("is-new"), 700);
+        setTimeout(() => cell.classList.remove("is-arriving"), 700);
       });
     });
+
+    if (newlyAdded.length) markNewUploads(newlyAdded);
+    syncAllRecentBadges();
 
     if (els.status) {
       const t = new Date().toLocaleTimeString();
@@ -150,6 +355,114 @@
       const id = cell.dataset.publicId;
       applyStepToCell(cell, { public_id: id });
     });
+  }
+
+  function stepLabel(step, index) {
+    const name = step && step.name ? String(step.name).trim() : "";
+    return name || `step_${index + 1}`;
+  }
+
+  function updateTransformLabel() {
+    if (!els.transformLabel || !steps.length) return;
+    const idx =
+      previewTransformIndex !== null
+        ? previewTransformIndex
+        : displayedTransformIndex;
+    const step = steps[idx % steps.length];
+    const t = String(step.transform || "").trim();
+    els.transformLabel.textContent = t ? `transformation: ${t}` : "transformation: —";
+  }
+
+  function cancelTypewriter() {
+    typewriterGen += 1;
+    if (typewriterTimer) {
+      clearTimeout(typewriterTimer);
+      typewriterTimer = null;
+    }
+  }
+
+  function typewriter(text, el) {
+    cancelTypewriter();
+    const gen = typewriterGen;
+    const full = String(text || "");
+    el.textContent = "";
+    el.classList.remove("is-done");
+    if (!full) {
+      el.classList.add("is-done");
+      return Promise.resolve();
+    }
+    const maxTypingMs = Math.max(800, POPUP_MS - 600);
+    const msPerChar = Math.max(12, Math.min(45, Math.floor(maxTypingMs / full.length)));
+
+    return new Promise((resolve) => {
+      let i = 0;
+      function tick() {
+        if (gen !== typewriterGen) {
+          resolve();
+          return;
+        }
+        el.textContent = full.slice(0, i + 1);
+        i += 1;
+        if (i >= full.length) {
+          el.classList.add("is-done");
+          resolve();
+          return;
+        }
+        typewriterTimer = setTimeout(tick, msPerChar);
+      }
+      tick();
+    });
+  }
+
+  function showTransformPopup(step, index) {
+    if (!els.popup || !els.popupName || !els.popupCode) return;
+    els.popup.hidden = false;
+    requestAnimationFrame(() => {
+      els.popup.classList.add("is-visible");
+    });
+    els.popupName.textContent = `name: ${stepLabel(step, index)}`;
+    typewriter(step.transform, els.popupCode);
+  }
+
+  function hideTransformPopup(onHidden) {
+    cancelTypewriter();
+    if (!els.popup) {
+      if (typeof onHidden === "function") onHidden();
+      return;
+    }
+    els.popup.classList.remove("is-visible");
+    if (popupFadeTimer) clearTimeout(popupFadeTimer);
+    popupFadeTimer = setTimeout(() => {
+      els.popup.hidden = true;
+      popupFadeTimer = null;
+      if (typeof onHidden === "function") onHidden();
+    }, 350);
+  }
+
+  function runTransformCycle() {
+    if (!steps.length) return;
+    if (cycleStepTimer) {
+      clearTimeout(cycleStepTimer);
+      cycleStepTimer = null;
+      previewTransformIndex = null;
+    }
+
+    const nextIndex = (displayedTransformIndex + 1) % steps.length;
+    const step = steps[nextIndex];
+    previewTransformIndex = nextIndex;
+    updateTransformLabel();
+    showTransformPopup(step, nextIndex);
+
+    cycleStepTimer = setTimeout(() => {
+      cycleStepTimer = null;
+      hideTransformPopup(() => {
+        displayedTransformIndex = nextIndex;
+        previewTransformIndex = null;
+        applyTransformToAll();
+        tickNewImageCycles();
+        updateTransformLabel();
+      });
+    }, POPUP_MS);
   }
 
   async function poll() {
@@ -168,11 +481,8 @@
     if (pollTimer) clearInterval(pollTimer);
     pollTimer = setInterval(poll, pollMs);
 
-    if (transformTimer) clearInterval(transformTimer);
-    transformTimer = setInterval(() => {
-      transformIndex = (transformIndex + 1) % steps.length;
-      applyTransformToAll();
-    }, TRANSFORM_MS);
+    if (cycleTimer) clearInterval(cycleTimer);
+    cycleTimer = setInterval(runTransformCycle, CYCLE_MS);
   }
 
   function setupQr() {
@@ -194,6 +504,7 @@
     initGridScrollFlag();
     if (!validateConfig()) return;
     setupQr();
+    updateTransformLabel();
     poll();
     startTimers();
   }

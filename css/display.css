@@ -14,6 +14,7 @@ body {
 }
 
 .wall {
+  position: relative;
   width: 1920px;
   height: 1080px;
   margin: 0 auto;
@@ -22,16 +23,23 @@ body {
   overflow: hidden;
   background: linear-gradient(165deg, #12121a 0%, #0a0a0f 50%, #0d1118 100%);
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --frame-transition: 750ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .wall-header {
+  position: relative;
   flex: 0 0 140px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  padding: 16px 24px;
+  padding: 16px 24px 12px;
   gap: 24px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.wall-header-left {
+  position: relative;
+  z-index: 2;
 }
 
 .wall-title {
@@ -46,7 +54,33 @@ body {
   margin-top: 4px;
 }
 
+.wall-header-transform {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 10px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 150px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.wall-transform-label {
+  margin: 0;
+  max-width: 1280px;
+  text-align: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 1.12rem;
+  line-height: 1.4;
+  opacity: 0.88;
+  word-break: break-all;
+}
+
 .wall-qr-wrap {
+  position: relative;
+  z-index: 2;
   flex-shrink: 0;
   text-align: right;
 }
@@ -71,8 +105,11 @@ body {
   min-height: 0;
   padding: 16px 24px 20px;
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
-  grid-auto-rows: 1fr;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-auto-rows: auto;
+  align-content: start;
+  align-items: start;
+  justify-items: center;
   gap: 10px;
 }
 
@@ -81,28 +118,30 @@ body {
 }
 
 .wall-grid[data-scroll="false"] {
-  overflow: hidden;
+  overflow: visible;
 }
 
 .cell {
   min-width: 0;
-  min-height: 0;
+  width: 100%;
+  height: auto;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  align-self: start;
   position: relative;
+  overflow: visible;
 }
 
+/* Frame size = Cloudinary w_/h_ in CSS pixels (set in display.js from transform string) */
 .frame {
   position: relative;
-  max-width: 100%;
-  max-height: 100%;
-  width: var(--frame-w, 88%);
-  height: var(--frame-h, 88%);
+  flex-shrink: 0;
+  box-sizing: border-box;
   transition:
-    width 0.65s cubic-bezier(0.4, 0, 0.2, 1),
-    height 0.65s cubic-bezier(0.4, 0, 0.2, 1);
-  border-radius: 10px;
+    width var(--frame-transition),
+    height var(--frame-transition);
+  border-radius: 0;
   overflow: hidden;
   box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.45),
@@ -115,11 +154,35 @@ body {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: opacity 0.35s ease;
+  transition: opacity 0.75s ease;
 }
 
-.cell.is-new .frame {
+.cell.is-arriving .frame {
   animation: cellIn 0.55s ease-out;
+}
+
+.cell--recent .frame {
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.45),
+    0 0 0 3px #3b82f6,
+    0 0 20px rgba(59, 130, 246, 0.35);
+}
+
+.frame-new-badge {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 2;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #eff6ff;
+  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.45);
+  pointer-events: none;
 }
 
 @keyframes cellIn {
@@ -152,5 +215,143 @@ body {
 
 .wall-error code {
   font-size: 0.85rem;
+  opacity: 0.85;
+}
+
+/* Center transformation preview popup (70% × 40% of wall) */
+.transform-popup {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 6, 10, 0.55);
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+
+.transform-popup.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.transform-popup[hidden] {
+  display: none;
+}
+
+.transform-popup-panel {
+  width: 70%;
+  height: 40%;
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+  padding: 28px 32px;
+  border-radius: 16px;
+  background: linear-gradient(160deg, #1c1c28 0%, #12121a 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(125, 211, 252, 0.08);
+}
+
+.transform-popup-title {
+  margin: 0 0 8px;
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  color: #f0f0f5;
+}
+
+.transform-popup-subtitle {
+  margin: 0 0 20px;
+  font-size: 1.05rem;
+  opacity: 0.75;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.transform-popup-code {
+  flex: 1;
+  margin: 0;
+  padding: 18px 20px;
+  overflow: auto;
+  border-radius: 10px;
+  background: #0a0a0f;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 1.05rem;
+  line-height: 1.55;
+  color: #a5f3fc;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.transform-popup-code::after {
+  content: "▋";
+  display: inline-block;
+  margin-left: 2px;
+  color: #7dd3fc;
+  animation: cursorBlink 0.9s step-end infinite;
+}
+
+.transform-popup-code.is-done::after {
+  display: none;
+}
+
+@keyframes cursorBlink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* New uploads announcement */
+.new-images-popup {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 6, 10, 0.5);
+  backdrop-filter: blur(3px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+
+.new-images-popup.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.new-images-popup[hidden] {
+  display: none;
+}
+
+.new-images-popup-panel {
+  padding: 36px 48px;
+  border-radius: 16px;
+  text-align: center;
+  background: linear-gradient(160deg, #1a2744 0%, #12121a 100%);
+  border: 1px solid rgba(59, 130, 246, 0.45);
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.55),
+    0 0 40px rgba(59, 130, 246, 0.2);
+}
+
+.new-images-popup-title {
+  margin: 0 0 12px;
+  font-size: 2.25rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #93c5fd;
+}
+
+.new-images-popup-detail {
+  margin: 0;
+  font-size: 1.15rem;
   opacity: 0.85;
 }

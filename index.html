@@ -9,9 +9,12 @@
   <body>
     <div class="wall" id="wall">
       <header class="wall-header">
-        <div>
+        <div class="wall-header-left">
           <div class="wall-title">Live selfie wall</div>
           <div class="wall-meta" id="wall-status">Loading…</div>
+        </div>
+        <div class="wall-header-transform">
+          <p class="wall-transform-label" id="wall-transform-label">transformation: —</p>
         </div>
         <div class="wall-qr-wrap">
           <img id="wall-qr" width="112" height="112" alt="" />
@@ -19,6 +22,21 @@
         </div>
       </header>
       <main class="wall-grid" id="wall-grid" data-scroll="false"></main>
+
+      <div class="transform-popup" id="transform-popup" hidden aria-live="polite">
+        <div class="transform-popup-panel">
+          <h2 class="transform-popup-title">transformation</h2>
+          <p class="transform-popup-subtitle" id="transform-popup-name">name:</p>
+          <pre class="transform-popup-code" id="transform-popup-code" aria-label="Transformation string"></pre>
+        </div>
+      </div>
+
+      <div class="new-images-popup" id="new-images-popup" hidden aria-live="polite">
+        <div class="new-images-popup-panel">
+          <h2 class="new-images-popup-title">New images!</h2>
+          <p class="new-images-popup-detail" id="new-images-popup-detail"></p>
+        </div>
+      </div>
     </div>
 
     <div class="wall-error" id="wall-error" hidden>
@@ -30,6 +48,7 @@
     </div>
 
     <script src="js/site-config.js"></script>
+    <script src="js/transform-dimensions.js"></script>
     <script src="js/transformations.js"></script>
     <script src="js/display.js"></script>
   </body>

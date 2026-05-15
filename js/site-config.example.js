@@ -15,4 +15,12 @@ window.SITE_CONFIG = {
   MAX_VISIBLE: 40,
   /** If true, grid area scrolls when content overflows (default false = full-bleed wall). */
   ALLOW_GRID_SCROLL: false,
+  /** 1 = on-screen frame pixels match w_/h_ in transformations.js */
+  FRAME_SCALE: 1,
+  /** Fallback width when transform has ar_ but no w_/h_ */
+  DEFAULT_DELIVERY_WIDTH: 240,
+  /** Transform cycles before a “new” badge is removed (default 10). */
+  NEW_IMAGE_CYCLES: 10,
+  /** “New images!” popup duration in ms (default 3500). */
+  NEW_IMAGES_POPUP_MS: 3500,
 };

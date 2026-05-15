@@ -12,4 +12,12 @@ window.SITE_CONFIG = {
   POLL_MS: 15000,
   MAX_VISIBLE: 40,
   ALLOW_GRID_SCROLL: false,
+  /** 1 = frame pixels match w_/h_ in transform; 0.5 = half size, etc. */
+  FRAME_SCALE: 1,
+  /** Used when a transform has ar_ but no w_ or h_ (e.g. ar_16:9 only). */
+  DEFAULT_DELIVERY_WIDTH: 240,
+  /** How many transform cycles a new upload keeps its badge (default 10). */
+  NEW_IMAGE_CYCLES: 10,
+  /** Duration of the “New images!” popup (ms). */
+  NEW_IMAGES_POPUP_MS: 3500,
 };
