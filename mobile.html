@@ -9,7 +9,7 @@
   <body>
     <div class="page">
       <h1>Upload your selfie</h1>
-      <p class="lead">Opens your camera or photo library in one step. Your image appears on the live wall shortly.</p>
+      <p class="lead">Choose a photo, check the preview, then upload. It appears on the live wall shortly.</p>
       <button type="button" class="btn" id="open-upload">Take or choose selfie</button>
       <input
         type="file"
@@ -18,6 +18,19 @@
         hidden
         aria-hidden="true"
       />
+
+      <div class="preview-panel" id="preview-panel" hidden>
+        <p class="preview-heading">Preview</p>
+        <div class="preview-frame">
+          <img id="preview-img" width="400" height="400" alt="Your selected photo" />
+        </div>
+        <p class="preview-filename" id="preview-filename"></p>
+        <div class="preview-actions">
+          <button type="button" class="btn" id="preview-upload">Upload to wall</button>
+          <button type="button" class="btn btn-secondary" id="preview-cancel">Choose different photo</button>
+        </div>
+      </div>
+
       <div class="toast" id="toast" hidden>Uploaded — check the big screen.</div>
       <div class="err" id="err" hidden></div>
       <p class="footer">Powered by Cloudinary</p>

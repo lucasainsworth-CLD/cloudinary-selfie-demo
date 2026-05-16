@@ -21,7 +21,7 @@ window.TRANSFORMATIONS = [
   },
   {
     name: "wide_face",
-    transform: "w_300,h_120,c_fill,g_face,q_auto:good",
+    transform: "w_300,h_120,c_auto,g_face,q_auto:good",
   },
   {
     name: "on_the_beach",

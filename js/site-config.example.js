@@ -25,4 +25,10 @@ window.SITE_CONFIG = {
   NEW_IMAGES_POPUP_MS: 3500,
   /** Header logo URL; empty = use built-in Cloudinary fallbacks in display.js */
   HEADER_LOGO_URL: "",
+  /** Mobile: width/height multiplier before upload (0.5 recommended). 1 = original size. */
+  CLIENT_UPLOAD_SCALE: 0.5,
+  /** Mobile: max longer edge after scaling (px). 0 = no cap. */
+  CLIENT_UPLOAD_MAX_EDGE: 1920,
+  /** Mobile: JPEG quality for resized upload (0.5–0.95). */
+  CLIENT_UPLOAD_JPEG_QUALITY: 0.82,
 };

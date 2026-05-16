@@ -26,4 +26,13 @@ window.SITE_CONFIG = {
    */
   HEADER_LOGO_URL:
     "https://res.cloudinary.com/dz6ajwh6k/image/upload/v1762988734/stacked_logo_box_tdfrid.png",
+  /**
+   * Mobile upload: scale dimensions before upload (0.5 ≈ ¼ the pixels, much faster).
+   * Use 1 to send the camera’s original file (slowest).
+   */
+  CLIENT_UPLOAD_SCALE: 0.5,
+  /** After scaling, cap the longer edge (px). Use 0 for no cap (only scale applies). */
+  CLIENT_UPLOAD_MAX_EDGE: 1920,
+  /** JPEG quality for the resized upload (0.5–0.95). */
+  CLIENT_UPLOAD_JPEG_QUALITY: 0.82,
 };

@@ -59,6 +59,68 @@ h1 {
   transform: none;
 }
 
+.btn-secondary {
+  margin-top: 10px;
+  color: #e8e8ec;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.btn-secondary:active {
+  transform: scale(0.98);
+}
+
+.btn-secondary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.preview-panel {
+  margin-top: 8px;
+}
+
+.preview-panel[hidden] {
+  display: none;
+}
+
+.preview-heading {
+  margin: 0 0 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.preview-frame {
+  border-radius: 12px;
+  overflow: hidden;
+  background: #14141c;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  max-height: min(52vh, 360px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preview-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: min(52vh, 360px);
+  object-fit: contain;
+}
+
+.preview-filename {
+  margin: 10px 0 0;
+  font-size: 0.78rem;
+  opacity: 0.5;
+  word-break: break-all;
+}
+
+.preview-actions {
+  margin-top: 18px;
+}
+
 .toast {
   margin-top: 20px;
   padding: 12px 14px;
