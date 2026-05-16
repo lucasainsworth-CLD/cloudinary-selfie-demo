@@ -20,4 +20,10 @@ window.SITE_CONFIG = {
   NEW_IMAGE_CYCLES: 10,
   /** Duration of the “New images!” popup (ms). */
   NEW_IMAGES_POPUP_MS: 3500,
+  /**
+   * Header Cloudinary logo (1:1). If empty, display.js uses built-in fallbacks.
+   * Set to any working https://res.cloudinary.com/… URL.
+   */
+  HEADER_LOGO_URL:
+    "https://res.cloudinary.com/dz6ajwh6k/image/upload/v1762988734/stacked_logo_box_tdfrid.png",
 };

@@ -4,6 +4,7 @@
   const cfg = window.SITE_CONFIG || {};
 
   const btn = document.getElementById("open-upload");
+  const input = document.getElementById("photo-input");
   const toast = document.getElementById("toast");
   const errEl = document.getElementById("err");
 
@@ -30,77 +31,70 @@
       showErr("Set UPLOAD_PRESET in js/site-config.js to your unsigned preset.");
       return false;
     }
-    if (typeof cloudinary === "undefined") {
-      showErr("Upload widget script failed to load. Check your network.");
-      return false;
-    }
-    if (
-      typeof cloudinary.openUploadWidget !== "function" &&
-      typeof cloudinary.createUploadWidget !== "function"
-    ) {
-      showErr("Cloudinary widget API missing. Check upload-widget script URL.");
-      return false;
-    }
     return true;
   }
 
-  let uploadWidgetInstance = null;
-
-  function widgetOptions() {
-    return {
-      cloudName: String(cfg.CLOUD_NAME).trim(),
-      uploadPreset: String(cfg.UPLOAD_PRESET).trim(),
-      sources: ["camera", "local"],
-      multiple: false,
-      maxFiles: 1,
-      showAdvancedOptions: false,
-      showUploadMoreButton: false,
-      styles: {
-        palette: {
-          window: "#12121a",
-          sourceBg: "#1a1a24",
-          windowBorder: "#2a2a36",
-          tabIcon: "#a78bfa",
-          inactiveTabIcon: "#6b6b7a",
-          menuIcons: "#c4b5fd",
-          link: "#7dd3fc",
-          action: "#7dd3fc",
-          inProgress: "#7dd3fc",
-          complete: "#4ade80",
-          error: "#f87171",
-          textDark: "#e8e8ec",
-          textLight: "#0a0a0c",
-        },
-      },
-    };
+  function setBusy(busy) {
+    if (!btn) return;
+    btn.disabled = busy;
+    btn.setAttribute("aria-busy", busy ? "true" : "false");
   }
 
-  function widgetCallback(error, result) {
-    if (error) {
-      showErr(error.message || String(error));
+  async function uploadImageFile(file) {
+    if (!file || !/^image\//.test(file.type)) {
+      showErr("Please choose an image file.");
       return;
     }
-    if (!result) return;
-    if (result.event === "success") {
-      showToast();
-    }
-  }
 
-  function openWidget() {
     hideErr();
     if (!validate()) return;
 
-    if (typeof cloudinary.openUploadWidget === "function") {
-      cloudinary.openUploadWidget(widgetOptions(), widgetCallback);
-      return;
+    const cloud = String(cfg.CLOUD_NAME).trim();
+    const preset = String(cfg.UPLOAD_PRESET).trim();
+    const tag = cfg.LIST_TAG && String(cfg.LIST_TAG).trim();
+
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("upload_preset", preset);
+    if (tag) fd.append("tags", tag);
+
+    setBusy(true);
+    try {
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${encodeURIComponent(cloud)}/image/upload`, {
+        method: "POST",
+        body: fd,
+      });
+      let data = {};
+      try {
+        data = await res.json();
+      } catch (_) {
+        /* ignore */
+      }
+      if (!res.ok) {
+        const msg =
+          (data.error && data.error.message) || `Upload failed (${res.status} ${res.statusText || ""})`;
+        showErr(msg);
+        return;
+      }
+      showToast();
+    } catch (e) {
+      showErr(e.message || String(e));
+    } finally {
+      setBusy(false);
+      if (input) input.value = "";
     }
-    if (!uploadWidgetInstance) {
-      uploadWidgetInstance = cloudinary.createUploadWidget(widgetOptions(), widgetCallback);
-    }
-    uploadWidgetInstance.open();
   }
 
-  if (btn) {
-    btn.addEventListener("click", openWidget);
+  if (btn && input) {
+    btn.addEventListener("click", () => {
+      hideErr();
+      if (!validate()) return;
+      input.click();
+    });
+
+    input.addEventListener("change", () => {
+      const file = input.files && input.files[0];
+      if (file) uploadImageFile(file);
+    });
   }
 })();

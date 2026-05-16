@@ -53,6 +53,12 @@ h1 {
   transform: scale(0.98);
 }
 
+.btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+  transform: none;
+}
+
 .toast {
   margin-top: 20px;
   padding: 12px 14px;

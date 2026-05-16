@@ -23,4 +23,6 @@ window.SITE_CONFIG = {
   NEW_IMAGE_CYCLES: 10,
   /** “New images!” popup duration in ms (default 3500). */
   NEW_IMAGES_POPUP_MS: 3500,
+  /** Header logo URL; empty = use built-in Cloudinary fallbacks in display.js */
+  HEADER_LOGO_URL: "",
 };

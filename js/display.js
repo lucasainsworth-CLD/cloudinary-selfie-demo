@@ -68,10 +68,24 @@
       .join("/");
   }
 
-  function imageUrl(publicId, transformSegment) {
+  /**
+   * Build delivery URL. If `step.deliveryUrlExtension` is set (e.g. "gif" for zoompan),
+   * any trailing image extension on public_id (.jpg, .png, …) is replaced with that
+   * extension; if there is no extension, `.gif` (etc.) is appended.
+   */
+  function imageUrl(publicId, step) {
     const cloud = cfg.CLOUD_NAME.trim();
+    const transformSegment = step && step.transform ? String(step.transform) : "";
     const t = transformSegment.replace(/^\/+|\/+$/g, "");
-    const id = encodePublicId(publicId);
+    let pid = String(publicId || "");
+    const fmt = step && step.deliveryUrlExtension ? String(step.deliveryUrlExtension).replace(/^\./, "") : "";
+    if (fmt) {
+      const withDot = `.${fmt.toLowerCase()}`;
+      const extRe = /\.(jpe?g|png|gif|webp|bmp|tiff?|svg|heic|avif)$/i;
+      if (extRe.test(pid)) pid = pid.replace(extRe, withDot);
+      else pid = `${pid}${withDot}`;
+    }
+    const id = encodePublicId(pid);
     return `https://res.cloudinary.com/${cloud}/image/upload/${t}/${id}`;
   }
 
@@ -296,7 +310,7 @@
     const img = cell.querySelector("img");
     if (!frame || !img || !resource) return;
     applyFrameSizeAnimated(frame, step);
-    applyImageSrc(img, imageUrl(resource.public_id, step.transform), frame);
+    applyImageSrc(img, imageUrl(resource.public_id, step), frame);
     img.alt = resource.public_id || "";
   }
 
@@ -494,6 +508,31 @@
     els.qr.referrerPolicy = "no-referrer";
   }
 
+  function setupHeaderLogo() {
+    const el = document.getElementById("wall-cloudinary-logo");
+    if (!el) return;
+    const configured = cfg.HEADER_LOGO_URL && String(cfg.HEADER_LOGO_URL).trim();
+    const builtins = [
+      "https://res.cloudinary.com/dz6ajwh6k/image/upload/v1762988734/stacked_logo_box_tdfrid.png",
+      "https://res.cloudinary.com/dz6ajwh6k/image/upload/f_png,q_auto/v1762988734/stacked_logo_box_tdfrid.png",
+      "https://res.cloudinary.com/dz6ajwh6k/image/upload/w_224,h_224,c_fill,f_png,q_auto/v1762988734/stacked_logo_box_tdfrid.png",
+      "https://res.cloudinary.com/dz6ajwh6k/image/upload/stacked_logo_box_tdfrid.png",
+    ];
+    const candidates = [...(configured ? [configured] : []), ...builtins].filter((u, i, a) => a.indexOf(u) === i);
+    let idx = 0;
+    el.referrerPolicy = "no-referrer";
+    el.decoding = "async";
+    el.onerror = () => {
+      idx += 1;
+      if (idx < candidates.length) {
+        el.src = candidates[idx];
+      } else {
+        el.onerror = null;
+      }
+    };
+    el.src = candidates[0];
+  }
+
   function initGridScrollFlag() {
     if (!els.grid) return;
     const allow = Boolean(cfg.ALLOW_GRID_SCROLL);
@@ -504,6 +543,7 @@
     initGridScrollFlag();
     if (!validateConfig()) return;
     setupQr();
+    setupHeaderLogo();
     updateTransformLabel();
     poll();
     startTimers();

@@ -62,7 +62,7 @@ body {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  padding: 0 150px;
+  padding: 0 300px;
   pointer-events: none;
   z-index: 1;
 }
@@ -78,11 +78,31 @@ body {
   word-break: break-all;
 }
 
-.wall-qr-wrap {
+.wall-header-brand {
   position: relative;
   z-index: 2;
   flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.wall-qr-wrap {
+  position: relative;
+  flex-shrink: 0;
   text-align: right;
+}
+
+.wall-logo-wrap {
+  flex-shrink: 0;
+}
+
+.wall-cloudinary-logo {
+  display: block;
+  width: 112px;
+  height: 112px;
+  border-radius: 8px;
+  object-fit: contain;
 }
 
 .wall-qr-wrap img {
