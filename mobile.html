@@ -9,15 +9,32 @@
   <body>
     <div class="page">
       <h1>Upload your selfie</h1>
-      <p class="lead">Choose a photo, check the preview, then upload. It appears on the live wall shortly.</p>
+      <p class="lead">Pick camera or library, preview, then upload. It appears on the live wall shortly.</p>
       <button type="button" class="btn" id="open-upload">Take or choose selfie</button>
+      <input type="file" id="photo-input-library" accept="image/*" hidden aria-hidden="true" />
       <input
         type="file"
-        id="photo-input"
+        id="photo-input-camera"
         accept="image/*"
+        capture="user"
         hidden
         aria-hidden="true"
       />
+
+      <div class="source-sheet" id="source-sheet" hidden>
+        <div class="source-sheet-backdrop" id="source-sheet-backdrop" aria-hidden="true"></div>
+        <div
+          class="source-sheet-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="source-sheet-title"
+        >
+          <p class="source-sheet-title" id="source-sheet-title">Add a photo</p>
+          <button type="button" class="btn" id="pick-camera">Take photo</button>
+          <button type="button" class="btn btn-secondary" id="pick-library">Photo library</button>
+          <button type="button" class="source-sheet-cancel" id="source-sheet-cancel">Cancel</button>
+        </div>
+      </div>
 
       <div class="preview-panel" id="preview-panel" hidden>
         <p class="preview-heading">Preview</p>

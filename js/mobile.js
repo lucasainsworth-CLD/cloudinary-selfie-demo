@@ -4,7 +4,13 @@
   const cfg = window.SITE_CONFIG || {};
 
   const btn = document.getElementById("open-upload");
-  const input = document.getElementById("photo-input");
+  const inputLibrary = document.getElementById("photo-input-library");
+  const inputCamera = document.getElementById("photo-input-camera");
+  const sourceSheet = document.getElementById("source-sheet");
+  const sourceBackdrop = document.getElementById("source-sheet-backdrop");
+  const pickCamera = document.getElementById("pick-camera");
+  const pickLibrary = document.getElementById("pick-library");
+  const sourceSheetCancel = document.getElementById("source-sheet-cancel");
   const toast = document.getElementById("toast");
   const errEl = document.getElementById("err");
   const previewPanel = document.getElementById("preview-panel");
@@ -52,6 +58,28 @@
       previewUpload.setAttribute("aria-busy", busy ? "true" : "false");
     }
     if (previewCancel) previewCancel.disabled = busy;
+    if (pickCamera) pickCamera.disabled = busy;
+    if (pickLibrary) pickLibrary.disabled = busy;
+    if (sourceSheetCancel) sourceSheetCancel.disabled = busy;
+  }
+
+  function showSourceSheet() {
+    if (sourceSheet) sourceSheet.hidden = false;
+    document.body.style.overflow = "hidden";
+  }
+
+  function hideSourceSheet() {
+    if (sourceSheet) sourceSheet.hidden = true;
+    document.body.style.overflow = "";
+  }
+
+  function openFileInputAfterSheet(el) {
+    hideSourceSheet();
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (el) el.click();
+      });
+    });
   }
 
   function clearPreview() {
@@ -66,7 +94,8 @@
     if (previewFilename) previewFilename.textContent = "";
     if (previewPanel) previewPanel.hidden = true;
     if (btn) btn.hidden = false;
-    if (input) input.value = "";
+    if (inputLibrary) inputLibrary.value = "";
+    if (inputCamera) inputCamera.value = "";
   }
 
   function showPreviewForFile(file) {
@@ -74,6 +103,7 @@
       showErr("Please choose an image file.");
       return;
     }
+    hideSourceSheet();
     hideErr();
     clearPreview();
     pendingFile = file;
@@ -256,17 +286,46 @@
     }
   }
 
-  if (btn && input) {
+  function wireFileInput(el) {
+    if (!el) return;
+    el.addEventListener("change", () => {
+      const file = el.files && el.files[0];
+      if (file) showPreviewForFile(file);
+    });
+  }
+
+  if (btn && inputLibrary && inputCamera && sourceSheet) {
     btn.addEventListener("click", () => {
       hideErr();
       if (!validate()) return;
-      input.click();
+      showSourceSheet();
     });
 
-    input.addEventListener("change", () => {
-      const file = input.files && input.files[0];
-      if (file) showPreviewForFile(file);
-    });
+    wireFileInput(inputLibrary);
+    wireFileInput(inputCamera);
+
+    if (pickCamera) {
+      pickCamera.addEventListener("click", () => {
+        if (!validate()) return;
+        openFileInputAfterSheet(inputCamera);
+      });
+    }
+    if (pickLibrary) {
+      pickLibrary.addEventListener("click", () => {
+        if (!validate()) return;
+        openFileInputAfterSheet(inputLibrary);
+      });
+    }
+    if (sourceSheetCancel) {
+      sourceSheetCancel.addEventListener("click", () => {
+        hideSourceSheet();
+      });
+    }
+    if (sourceBackdrop) {
+      sourceBackdrop.addEventListener("click", () => {
+        hideSourceSheet();
+      });
+    }
   }
 
   if (previewUpload) {
@@ -280,7 +339,7 @@
     previewCancel.addEventListener("click", () => {
       hideErr();
       clearPreview();
-      if (input && validate()) input.click();
+      if (validate()) showSourceSheet();
     });
   }
 })();
