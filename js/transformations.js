@@ -11,13 +11,14 @@
  * @type {{ name: string, transform: string, deliveryWidth?: number, deliveryHeight?: number, deliveryUrlExtension?: string }[]}
  */
 window.TRANSFORMATIONS = [
-  {
-    name: "profile_picture",
-    transform: "w_300,h_300,c_thumb,g_face/e_background_removal/r_max",
-  },
+
   {
     name: "CAB_portrait",
     transform: "ar_3:4,c_auto,w_300/l_cab-overlay_kfdwnz/c_scale,w_300/fl_layer_apply,fl_no_overflow,g_south_east/r_20",
+  },
+  {
+    name: "profile_picture",
+    transform: "w_300,h_300,c_thumb,g_face/e_background_removal/r_max",
   },
   {
     name: "greyscale_logo",
