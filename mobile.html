@@ -21,21 +21,6 @@
         aria-hidden="true"
       />
 
-      <div class="source-sheet" id="source-sheet" hidden>
-        <div class="source-sheet-backdrop" id="source-sheet-backdrop" aria-hidden="true"></div>
-        <div
-          class="source-sheet-panel"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="source-sheet-title"
-        >
-          <p class="source-sheet-title" id="source-sheet-title">Add a photo</p>
-          <button type="button" class="btn" id="pick-camera">Take photo</button>
-          <button type="button" class="btn btn-secondary" id="pick-library">Photo library</button>
-          <button type="button" class="source-sheet-cancel" id="source-sheet-cancel">Cancel</button>
-        </div>
-      </div>
-
       <div class="preview-panel" id="preview-panel" hidden>
         <p class="preview-heading">Preview</p>
         <div class="preview-frame">
@@ -51,6 +36,21 @@
       <div class="toast" id="toast" hidden>Uploaded — check the big screen.</div>
       <div class="err" id="err" hidden></div>
       <p class="footer">Powered by Cloudinary</p>
+    </div>
+
+    <div class="source-sheet" id="source-sheet" hidden>
+      <div class="source-sheet-backdrop" id="source-sheet-backdrop" aria-hidden="true"></div>
+      <div
+        class="source-sheet-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="source-sheet-title"
+      >
+        <p class="source-sheet-title" id="source-sheet-title">Add a photo</p>
+        <button type="button" class="btn" id="pick-camera">Take photo</button>
+        <button type="button" class="btn btn-secondary" id="pick-library">Photo library</button>
+        <button type="button" class="source-sheet-cancel" id="source-sheet-cancel">Cancel</button>
+      </div>
     </div>
 
     <script src="js/site-config.js"></script>

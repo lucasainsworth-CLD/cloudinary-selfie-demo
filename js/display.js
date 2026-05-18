@@ -3,10 +3,36 @@
 
   const cfg = window.SITE_CONFIG || {};
   const steps = window.TRANSFORMATIONS || [];
-  const CYCLE_MS = 12000;
+  const CYCLE_MS = Math.max(1000, Number(cfg.TRANSFORM_CYCLE_MS) || 16000);
   const POPUP_MS = 4000;
-  const NEW_IMAGE_CYCLES = Math.max(1, Number(cfg.NEW_IMAGE_CYCLES) || 10);
+  /** Full passes through TRANSFORMATIONS before “new” badge/position expires (default 6). */
+  const NEW_IMAGE_ROUNDS = Math.max(1, Number(cfg.NEW_IMAGE_CYCLES) || 6);
   const NEW_IMAGES_POPUP_MS = Math.max(1500, Number(cfg.NEW_IMAGES_POPUP_MS) || 3500);
+  const MAX_VISIBLE = Math.max(1, Math.min(1000, Number(cfg.MAX_VISIBLE) || 40));
+  const WALL_ROTATION_STEP = Math.max(1, Number(cfg.WALL_ROTATION_STEP) || 10);
+  const AUTO_SCROLL_GRID = cfg.AUTO_SCROLL_GRID !== false;
+  let hasScheduledInitialScroll = false;
+
+  const rawScrollMaxSpeed = Number(cfg.AUTO_SCROLL_MAX_SPEED_PX_S);
+  const AUTO_SCROLL_MAX_SPEED_PX_S = Number.isFinite(rawScrollMaxSpeed)
+    ? Math.max(0, rawScrollMaxSpeed)
+    : 280;
+
+  /** Ms to scroll after apply until next transform popup; boot uses full cycle. */
+  function autoScrollDurationMs(fromBoot, maxScroll) {
+    const raw = Number(cfg.AUTO_SCROLL_MS);
+    let base =
+      Number.isFinite(raw) && raw > 0
+        ? raw
+        : fromBoot
+          ? CYCLE_MS
+          : Math.max(1000, CYCLE_MS - POPUP_MS);
+    if (AUTO_SCROLL_MAX_SPEED_PX_S > 0 && maxScroll > 4) {
+      const minForSpeed = Math.ceil((maxScroll / AUTO_SCROLL_MAX_SPEED_PX_S) * 1000);
+      base = Math.max(base, minForSpeed);
+    }
+    return base;
+  }
   const CELL_INNER_HTML =
     '<div class="frame"><img loading="lazy" alt="" style="opacity:1" /><span class="frame-new-badge" hidden>new</span></div>';
 
@@ -40,6 +66,14 @@
   const knownPublicIds = new Set();
   const newImageCycles = new Map();
   let listInitialized = false;
+  /** Full tag list from last poll (newest first). */
+  let cachedResources = [];
+  /** Advances after each full TRANSFORMATIONS loop to slide the non-new window. */
+  let rotationIndex = 0;
+  /** Stable display order (public_ids); only reshuffled when rotation advances. */
+  let wallOrderIds = [];
+  let autoScrollRaf = null;
+  let autoScrollLayoutTimer = null;
 
   function showError(msg) {
     if (els.error && els.errorText) {
@@ -138,15 +172,110 @@
     return true;
   }
 
-  function sortAndCap(resources) {
-    const max = Math.max(1, Math.min(1000, Number(cfg.MAX_VISIBLE) || 40));
+  function sortByNewest(resources) {
     const list = Array.isArray(resources) ? resources.slice() : [];
     list.sort((a, b) => {
       const ta = new Date(a.created_at || 0).getTime();
       const tb = new Date(b.created_at || 0).getTime();
       return tb - ta;
     });
-    return list.slice(0, max);
+    return list;
+  }
+
+  function isResourceNew(resource) {
+    const id = resource && resource.public_id;
+    return id ? (newImageCycles.get(id) || 0) > 0 : false;
+  }
+
+  function seededShuffle(items, seed) {
+    const arr = items.slice();
+    let state = seed >>> 0;
+    const nextUnit = () => {
+      state = (Math.imul(1664525, state) + 1013904223) >>> 0;
+      return state / 4294967296;
+    };
+    for (let i = arr.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(nextUnit() * (i + 1));
+      const tmp = arr[i];
+      arr[i] = arr[j];
+      arr[j] = tmp;
+    }
+    return arr;
+  }
+
+  function rotatingWindowSlice(nonNew, slotsForRotating) {
+    if (slotsForRotating <= 0 || nonNew.length === 0) {
+      return { slice: [], start: 0 };
+    }
+    if (nonNew.length <= slotsForRotating) {
+      return { slice: nonNew, start: 0 };
+    }
+    const maxStart = nonNew.length - slotsForRotating;
+    let start = rotationIndex * WALL_ROTATION_STEP;
+    if (start > maxStart) {
+      start = start % (maxStart + 1);
+    }
+    return { slice: nonNew.slice(start, start + slotsForRotating), start };
+  }
+
+  function mergeWallOrderPreservingRotate(prevIds, ctx) {
+    const { newIds, poolIds, byId, rotatingPool } = ctx;
+    const newSet = new Set(newIds);
+    const result = [];
+    const seen = new Set();
+
+    newIds.forEach((id) => {
+      if (!byId.has(id) || seen.has(id)) return;
+      result.push(id);
+      seen.add(id);
+    });
+
+    prevIds.forEach((id) => {
+      if (seen.has(id) || !byId.has(id) || newSet.has(id) || !poolIds.has(id)) return;
+      result.push(id);
+      seen.add(id);
+    });
+
+    rotatingPool.forEach((r) => {
+      if (result.length >= MAX_VISIBLE) return;
+      const id = r.public_id;
+      if (seen.has(id) || !byId.has(id)) return;
+      result.push(id);
+      seen.add(id);
+    });
+
+    return result.slice(0, MAX_VISIBLE);
+  }
+
+  /**
+   * Wall order: “new” first, then a shuffled slice of non-new (sliding window).
+   * Order is stable across list polls until advanceWallRotation() (full transform loop).
+   */
+  function buildWallList(resources, options) {
+    const forceReshuffle = options && options.forceReshuffle === true;
+    const sorted = sortByNewest(resources);
+    const byId = new Map(sorted.map((r) => [r.public_id, r]));
+    const newOnes = sorted.filter((r) => isResourceNew(r));
+    const nonNew = sorted.filter((r) => !isResourceNew(r));
+    const slotsForRotating = Math.max(0, MAX_VISIBLE - newOnes.length);
+    const { slice: rotatingPool, start } = rotatingWindowSlice(nonNew, slotsForRotating);
+    const poolIds = new Set(rotatingPool.map((r) => r.public_id));
+    const newIds = newOnes.map((r) => r.public_id);
+
+    if (forceReshuffle || wallOrderIds.length === 0) {
+      const seed = (Math.imul(rotationIndex + 1, 2654435761) ^ Math.imul(start + 1, 2246822519)) >>> 0;
+      const shuffled = seededShuffle(rotatingPool, seed);
+      wallOrderIds = [...newIds, ...shuffled.map((r) => r.public_id)].slice(0, MAX_VISIBLE);
+    } else {
+      wallOrderIds = mergeWallOrderPreservingRotate(wallOrderIds, {
+        newIds,
+        poolIds,
+        byId,
+        rotatingPool,
+      });
+    }
+
+    return wallOrderIds.map((id) => byId.get(id)).filter(Boolean);
   }
 
   async function fetchResources() {
@@ -168,7 +297,7 @@
       throw new Error(hint + bodyPreview);
     }
     const data = await res.json();
-    return sortAndCap(data.resources || []);
+    return sortByNewest(data.resources || []);
   }
 
   function applyFrameSizeAnimated(frame, step) {
@@ -233,7 +362,7 @@
 
   function markNewUploads(publicIds) {
     if (!publicIds.length) return;
-    publicIds.forEach((id) => newImageCycles.set(id, NEW_IMAGE_CYCLES));
+    publicIds.forEach((id) => newImageCycles.set(id, NEW_IMAGE_ROUNDS));
     showNewImagesPopup(publicIds.length);
   }
 
@@ -256,13 +385,29 @@
     grid.querySelectorAll(".cell").forEach(syncRecentBadge);
   }
 
-  function tickNewImageCycles() {
-    if (!newImageCycles.size) return;
+  /** Decrement “new” status once per full TRANSFORMATIONS loop (not per step). */
+  function tickNewImageRounds() {
+    if (!newImageCycles.size) return false;
+    let membershipChanged = false;
     for (const [id, left] of [...newImageCycles.entries()]) {
-      if (left <= 1) newImageCycles.delete(id);
-      else newImageCycles.set(id, left - 1);
+      if (left <= 1) {
+        newImageCycles.delete(id);
+        membershipChanged = true;
+      } else {
+        newImageCycles.set(id, left - 1);
+      }
     }
     syncAllRecentBadges();
+    return membershipChanged;
+  }
+
+  /** Slide + shuffle non-new slots; tick new-image rounds (once per full pass). */
+  function advanceWallRotation() {
+    rotationIndex += 1;
+    tickNewImageRounds();
+    if (cachedResources.length) {
+      render(buildWallList(cachedResources, { forceReshuffle: true }));
+    }
   }
 
   function hideNewImagesPopup() {
@@ -304,6 +449,71 @@
     }
   }
 
+  function isTransformPopupVisible() {
+    return Boolean(els.popup && !els.popup.hidden && els.popup.classList.contains("is-visible"));
+  }
+
+  function cancelGridAutoScroll() {
+    if (autoScrollRaf) {
+      cancelAnimationFrame(autoScrollRaf);
+      autoScrollRaf = null;
+    }
+    if (autoScrollLayoutTimer) {
+      clearTimeout(autoScrollLayoutTimer);
+      autoScrollLayoutTimer = null;
+    }
+  }
+
+  function getGridMaxScroll(grid) {
+    return Math.max(0, grid.scrollHeight - grid.clientHeight);
+  }
+
+  function startGridAutoScroll(fromBoot) {
+    const grid = els.grid;
+    if (!AUTO_SCROLL_GRID || !grid || grid.dataset.scroll !== "true") return;
+
+    cancelGridAutoScroll();
+    grid.scrollTop = 0;
+
+    const maxScroll = getGridMaxScroll(grid);
+    if (maxScroll <= 4) {
+      return;
+    }
+
+    const duration = autoScrollDurationMs(fromBoot, maxScroll);
+    const startTime = performance.now();
+
+    function tick(now) {
+      if (!AUTO_SCROLL_GRID) {
+        autoScrollRaf = null;
+        return;
+      }
+      const elapsed = now - startTime;
+      const t = Math.min(1, elapsed / duration);
+      const currentMax = getGridMaxScroll(grid);
+      grid.scrollTop = Math.round(t * currentMax);
+      if (t < 1) {
+        autoScrollRaf = requestAnimationFrame(tick);
+      } else {
+        autoScrollRaf = null;
+      }
+    }
+    autoScrollRaf = requestAnimationFrame(tick);
+  }
+
+  /** Wait for frame size transitions, then measure row height and scroll. */
+  function scheduleAutoScrollAfterLayout(fromBoot) {
+    if (!AUTO_SCROLL_GRID) return;
+    cancelGridAutoScroll();
+    if (autoScrollLayoutTimer) clearTimeout(autoScrollLayoutTimer);
+    autoScrollLayoutTimer = setTimeout(() => {
+      autoScrollLayoutTimer = null;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => startGridAutoScroll(fromBoot));
+      });
+    }, FRAME_TRANSITION_MS + 80);
+  }
+
   function applyStepToCell(cell, resource) {
     const step = steps[activeTransformIndex() % steps.length];
     const frame = cell.querySelector(".frame");
@@ -318,7 +528,6 @@
     const grid = els.grid;
     if (!grid) return;
 
-    const newlyAdded = detectNewPublicIds(resources);
     const prevIds = new Set(Array.from(grid.querySelectorAll(".cell")).map((c) => c.dataset.publicId));
     const existing = new Map(
       Array.from(grid.querySelectorAll(".cell")).map((c) => [c.dataset.publicId, c])
@@ -353,12 +562,21 @@
       });
     });
 
-    if (newlyAdded.length) markNewUploads(newlyAdded);
     syncAllRecentBadges();
 
     if (els.status) {
       const t = new Date().toLocaleTimeString();
       els.status.textContent = `${resources.length} on wall · updated ${t}`;
+    }
+
+    if (
+      AUTO_SCROLL_GRID &&
+      !hasScheduledInitialScroll &&
+      previewTransformIndex === null &&
+      !isTransformPopupVisible()
+    ) {
+      hasScheduledInitialScroll = true;
+      scheduleAutoScrollAfterLayout(true);
     }
   }
 
@@ -369,6 +587,7 @@
       const id = cell.dataset.publicId;
       applyStepToCell(cell, { public_id: id });
     });
+    scheduleAutoScrollAfterLayout(false);
   }
 
   function stepLabel(step, index) {
@@ -383,8 +602,8 @@
         ? previewTransformIndex
         : displayedTransformIndex;
     const step = steps[idx % steps.length];
-    const t = String(step.transform || "").trim();
-    els.transformLabel.textContent = t ? `transformation: ${t}` : "transformation: —";
+    const label = stepLabel(step, idx);
+    els.transformLabel.textContent = `apply transformation: ${label}`;
   }
 
   function cancelTypewriter() {
@@ -473,7 +692,9 @@
         displayedTransformIndex = nextIndex;
         previewTransformIndex = null;
         applyTransformToAll();
-        tickNewImageCycles();
+        if (nextIndex === 0) {
+          advanceWallRotation();
+        }
         updateTransformLabel();
       });
     }, POPUP_MS);
@@ -481,8 +702,10 @@
 
   async function poll() {
     try {
-      const resources = await fetchResources();
-      render(resources);
+      cachedResources = await fetchResources();
+      const newlyAdded = detectNewPublicIds(cachedResources);
+      if (newlyAdded.length) markNewUploads(newlyAdded);
+      render(buildWallList(cachedResources));
       if (els.error) els.error.hidden = true;
     } catch (e) {
       console.error(e);
@@ -535,8 +758,9 @@
 
   function initGridScrollFlag() {
     if (!els.grid) return;
-    const allow = Boolean(cfg.ALLOW_GRID_SCROLL);
+    const allow = Boolean(cfg.ALLOW_GRID_SCROLL) || AUTO_SCROLL_GRID;
     els.grid.dataset.scroll = allow ? "true" : "false";
+    els.grid.dataset.autoScroll = AUTO_SCROLL_GRID ? "true" : "false";
   }
 
   function boot() {

@@ -11,13 +11,26 @@ window.SITE_CONFIG = {
   MOBILE_PAGE_URL: "https://lucasainsworth-cld.github.io/cloudinary-selfie-demo/mobile.html",
   POLL_MS: 15000,
   MAX_VISIBLE: 40,
+  /** Ms between transform steps (popup + apply); also drives auto-scroll duration. */
+  TRANSFORM_CYCLE_MS: 16000,
   ALLOW_GRID_SCROLL: false,
+  /** Smooth scroll the grid top→bottom each transform (default on). */
+  AUTO_SCROLL_GRID: true,
+  /** Optional scroll duration override; omit or 0 = sync to cycle (12s after apply, 16s on first load). */
+  AUTO_SCROLL_MS: 0,
+  /** Max grid scroll speed (px/s); duration stretches on tall grids (0 = no cap). */
+  AUTO_SCROLL_MAX_SPEED_PX_S: 280,
   /** 1 = frame pixels match w_/h_ in transform; 0.5 = half size, etc. */
   FRAME_SCALE: 1,
   /** Used when a transform has ar_ but no w_ or h_ (e.g. ar_16:9 only). */
   DEFAULT_DELIVERY_WIDTH: 240,
-  /** How many transform cycles a new upload keeps its badge (default 10). */
-  NEW_IMAGE_CYCLES: 10,
+  /**
+   * How many full passes through TRANSFORMATIONS a new upload stays “new” (default 6).
+   * Duration ≈ TRANSFORM_CYCLE_MS × transform count × this value.
+   */
+  NEW_IMAGE_CYCLES: 6,
+  /** Non-new wall slots: sliding window advances this many indices per transform cycle. */
+  WALL_ROTATION_STEP: 10,
   /** Duration of the “New images!” popup (ms). */
   NEW_IMAGES_POPUP_MS: 3500,
   /**

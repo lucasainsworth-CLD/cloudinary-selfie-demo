@@ -13,14 +13,24 @@ window.SITE_CONFIG = {
   /** How often to refetch tag list JSON (Cloudinary caches list ~60s). */
   POLL_MS: 15000,
   MAX_VISIBLE: 40,
+  /** Ms per transform step (default 16000). */
+  TRANSFORM_CYCLE_MS: 16000,
   /** If true, grid area scrolls when content overflows (default false = full-bleed wall). */
   ALLOW_GRID_SCROLL: false,
+  /** Auto-scroll grid during each transform (default true). */
+  AUTO_SCROLL_GRID: true,
+  /** Optional scroll duration override; 0 = auto (cycle − popup after each apply). */
+  AUTO_SCROLL_MS: 0,
+  /** Max scroll speed in px/s; longer grids get a longer duration (0 = no cap). */
+  AUTO_SCROLL_MAX_SPEED_PX_S: 280,
   /** 1 = on-screen frame pixels match w_/h_ in transformations.js */
   FRAME_SCALE: 1,
   /** Fallback width when transform has ar_ but no w_/h_ */
   DEFAULT_DELIVERY_WIDTH: 240,
-  /** Transform cycles before a “new” badge is removed (default 10). */
-  NEW_IMAGE_CYCLES: 10,
+  /** Full TRANSFORMATIONS loops before “new” badge ends (≈ cycle ms × step count × value). */
+  NEW_IMAGE_CYCLES: 6,
+  /** Sliding window step for rotating non-new images on the wall (default 10). */
+  WALL_ROTATION_STEP: 10,
   /** “New images!” popup duration in ms (default 3500). */
   NEW_IMAGES_POPUP_MS: 3500,
   /** Header logo URL; empty = use built-in Cloudinary fallbacks in display.js */

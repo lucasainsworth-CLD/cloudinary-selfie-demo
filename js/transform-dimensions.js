@@ -2,7 +2,7 @@
  * Infer display frame pixels from a Cloudinary transformation URL segment.
  * Supports w_, h_, ar_X:Y in any order, including chained steps (comma or /).
  *
- * Rules (last w_/h_ in the string wins if multiple):
+ * Rules (last integer w_/h_ in the string wins; fractional overlay sizes like w_0.50 are ignored):
  *   w + h     → use both
  *   w + ar    → h = w × (arH / arW)     e.g. ar_1:1,c_auto,w_100 → 100×100
  *   h + ar    → w = h × (arW / arH)
@@ -29,8 +29,9 @@
     const defaultW = Math.max(1, Number(opts.defaultWidth) || 240);
     const t = String(transformString || "");
 
-    const wM = lastMatchAll(t, /(?:^|[,/])w_(\d+)/);
-    const hM = lastMatchAll(t, /(?:^|[,/])h_(\d+)/);
+    // Ignore fractional overlay sizes (e.g. w_0.50) — only integer w_/h_ count.
+    const wM = lastMatchAll(t, /(?:^|[,/])w_(\d+)(?!\.)/);
+    const hM = lastMatchAll(t, /(?:^|[,/])h_(\d+)(?!\.)/);
     const arM = lastMatchAll(t, /(?:^|[,/])ar_(\d+):(\d+)/);
 
     const w = wM ? Number(wM[1]) : null;

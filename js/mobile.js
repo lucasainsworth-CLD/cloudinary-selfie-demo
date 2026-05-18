@@ -26,6 +26,11 @@
     if (!errEl) return;
     errEl.hidden = false;
     errEl.textContent = msg;
+    try {
+      errEl.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    } catch (_) {
+      /* ignore */
+    }
   }
 
   function hideErr() {
@@ -294,38 +299,42 @@
     });
   }
 
-  if (btn && inputLibrary && inputCamera && sourceSheet) {
+  if (btn) {
     btn.addEventListener("click", () => {
       hideErr();
       if (!validate()) return;
-      showSourceSheet();
+      if (sourceSheet) {
+        showSourceSheet();
+      } else if (inputLibrary) {
+        inputLibrary.click();
+      }
     });
+  }
 
-    wireFileInput(inputLibrary);
-    wireFileInput(inputCamera);
+  wireFileInput(inputLibrary);
+  wireFileInput(inputCamera);
 
-    if (pickCamera) {
-      pickCamera.addEventListener("click", () => {
-        if (!validate()) return;
-        openFileInputAfterSheet(inputCamera);
-      });
-    }
-    if (pickLibrary) {
-      pickLibrary.addEventListener("click", () => {
-        if (!validate()) return;
-        openFileInputAfterSheet(inputLibrary);
-      });
-    }
-    if (sourceSheetCancel) {
-      sourceSheetCancel.addEventListener("click", () => {
-        hideSourceSheet();
-      });
-    }
-    if (sourceBackdrop) {
-      sourceBackdrop.addEventListener("click", () => {
-        hideSourceSheet();
-      });
-    }
+  if (pickCamera && inputCamera) {
+    pickCamera.addEventListener("click", () => {
+      if (!validate()) return;
+      openFileInputAfterSheet(inputCamera);
+    });
+  }
+  if (pickLibrary && inputLibrary) {
+    pickLibrary.addEventListener("click", () => {
+      if (!validate()) return;
+      openFileInputAfterSheet(inputLibrary);
+    });
+  }
+  if (sourceSheetCancel) {
+    sourceSheetCancel.addEventListener("click", () => {
+      hideSourceSheet();
+    });
+  }
+  if (sourceBackdrop) {
+    sourceBackdrop.addEventListener("click", () => {
+      hideSourceSheet();
+    });
   }
 
   if (previewUpload) {
